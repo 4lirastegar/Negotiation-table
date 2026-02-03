@@ -1,0 +1,71 @@
+{
+  "name": "Task Scheduling",
+  "description": "Two agents must decide who does which household chores. Each has preferences and constraints.",
+  "type": "task_allocation",
+  "public_info": {
+    "tasks": [
+      {
+        "task": "Dishes",
+        "time_required": "30 minutes",
+        "frequency": "Daily"
+      },
+      {
+        "task": "Laundry",
+        "time_required": "1 hour",
+        "frequency": "Weekly"
+      },
+      {
+        "task": "Grocery Shopping",
+        "time_required": "45 minutes",
+        "frequency": "Weekly"
+      },
+      {
+        "task": "Vacuuming",
+        "time_required": "20 minutes",
+        "frequency": "Twice weekly"
+      }
+    ],
+    "rule": "All tasks must be assigned. Both agents should do equal work."
+  },
+  "agent_a_secrets": {
+    "role": "Roommate A",
+    "preferences": {
+      "Dishes": "dislike",
+      "Laundry": "like",
+      "Grocery Shopping": "neutral",
+      "Vacuuming": "like"
+    },
+    "constraints": {
+      "available_days": ["Monday", "Wednesday", "Friday", "Sunday"],
+      "max_tasks_per_week": 2
+    },
+    "strategy": "Prefers Laundry and Vacuuming. Hates doing Dishes."
+  },
+  "agent_b_secrets": {
+    "role": "Roommate B",
+    "preferences": {
+      "Dishes": "like",
+      "Laundry": "dislike",
+      "Grocery Shopping": "like",
+      "Vacuuming": "neutral"
+    },
+    "constraints": {
+      "available_days": ["Tuesday", "Thursday", "Saturday"],
+      "max_tasks_per_week": 2
+    },
+    "strategy": "Prefers Dishes and Grocery Shopping. Doesn't mind Vacuuming but hates Laundry."
+  },
+  "market_value": {
+    "task_difficulty": {
+      "Dishes": 3,
+      "Laundry": 5,
+      "Grocery Shopping": 4,
+      "Vacuuming": 2
+    },
+    "total_workload": 14
+  },
+  "agreement_criteria": {
+    "success_condition": "Both agents agree on task allocation where all tasks are assigned and work is balanced",
+    "failure_condition": "No agreement reached or tasks remain unassigned"
+  }
+}

@@ -1,0 +1,315 @@
+"""
+Judge/Adjudicator System
+Analyzes negotiation transcripts to determine outcomes, agreements, and winners
+"""
+
+from typing import Dict, List, Any, Optional
+from config.config import OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_PROVIDER, LLM_MODEL
+import json
+import re
+
+
+class Judge:
+    """Adjudicator that analyzes negotiation outcomes"""
+    
+    def __init__(self, llm_provider: str = None, llm_model: str = None):
+        """
+        Initialize the Judge
+        
+        Args:
+            llm_provider: LLM provider to use (openai or anthropic)
+            llm_model: Model name to use
+        """
+        self.llm_provider = llm_provider or LLM_PROVIDER
+        self.llm_model = llm_model or LLM_MODEL
+        self.llm_client = self._initialize_llm_client()
+    
+    def _initialize_llm_client(self):
+        """Initialize the appropriate LLM client"""
+        if self.llm_provider == "openai":
+            try:
+                from openai import OpenAI
+                if not OPENAI_API_KEY:
+                    raise ValueError("OPENAI_API_KEY not found in environment")
+                return OpenAI(api_key=OPENAI_API_KEY)
+            except ImportError:
+                raise ImportError("openai package not installed")
+        
+        elif self.llm_provider == "anthropic":
+            try:
+                from anthropic import Anthropic
+                if not ANTHROPIC_API_KEY:
+                    raise ValueError("ANTHROPIC_API_KEY not found in environment")
+                return Anthropic(api_key=ANTHROPIC_API_KEY)
+            except ImportError:
+                raise ImportError("anthropic package not installed")
+        
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
+    
+    def analyze_negotiation(
+        self,
+        messages: List[Dict],
+        scenario_info: Dict,
+        agent_a_secrets: Dict,
+        agent_b_secrets: Dict,
+        scenario_type: str = "price_negotiation"
+    ) -> Dict[str, Any]:
+        """
+        Analyze a complete negotiation transcript and determine the outcome
+        
+        Args:
+            messages: List of all messages in the negotiation
+            scenario_info: Public scenario information
+            agent_a_secrets: Agent A's private information
+            agent_b_secrets: Agent B's private information
+            scenario_type: Type of scenario (price_negotiation, resource_allocation, etc.)
+            
+        Returns:
+            Dictionary with analysis results
+        """
+        # Build the analysis prompt
+        prompt = self._build_analysis_prompt(
+            messages, scenario_info, agent_a_secrets, agent_b_secrets, scenario_type
+        )
+        
+        # Get LLM analysis
+        analysis_text = self._call_llm(prompt)
+        
+        # Parse the analysis
+        analysis = self._parse_analysis(analysis_text, scenario_type)
+        
+        # Extract agreement terms if agreement reached
+        if analysis.get("agreement_reached"):
+            analysis["agreement_terms"] = self._extract_agreement_terms(
+                messages, scenario_type, agent_a_secrets, agent_b_secrets
+            )
+        else:
+            analysis["agreement_terms"] = None
+        
+        return analysis
+    
+    def _build_analysis_prompt(
+        self,
+        messages: List[Dict],
+        scenario_info: Dict,
+        agent_a_secrets: Dict,
+        agent_b_secrets: Dict,
+        scenario_type: str
+    ) -> str:
+        """Build the prompt for the Judge to analyze the negotiation"""
+        
+        # Format conversation
+        conversation_text = self._format_conversation(messages)
+        
+        # Build prompt
+        prompt_parts = []
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("YOU ARE A NEGOTIATION ADJUDICATOR")
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("")
+        prompt_parts.append("Your task is to analyze a negotiation transcript and determine:")
+        prompt_parts.append("1. Was an agreement reached?")
+        prompt_parts.append("2. What were the agreed terms (if any)?")
+        prompt_parts.append("3. Who 'won' or benefited more?")
+        prompt_parts.append("4. Why did the negotiation succeed or fail?")
+        prompt_parts.append("")
+        
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("SCENARIO INFORMATION:")
+        prompt_parts.append("=" * 70)
+        prompt_parts.append(f"Type: {scenario_type}")
+        prompt_parts.append(f"Public Info: {json.dumps(scenario_info, indent=2)}")
+        prompt_parts.append("")
+        
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("AGENT SECRETS (for reference only - agents didn't know each other's secrets):")
+        prompt_parts.append("=" * 70)
+        prompt_parts.append(f"Agent A Secrets: {json.dumps(agent_a_secrets, indent=2)}")
+        prompt_parts.append(f"Agent B Secrets: {json.dumps(agent_b_secrets, indent=2)}")
+        prompt_parts.append("")
+        
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("NEGOTIATION TRANSCRIPT:")
+        prompt_parts.append("=" * 70)
+        prompt_parts.append(conversation_text)
+        prompt_parts.append("")
+        
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("YOUR ANALYSIS:")
+        prompt_parts.append("=" * 70)
+        prompt_parts.append("")
+        prompt_parts.append("Provide your analysis in the following JSON format:")
+        prompt_parts.append("{")
+        prompt_parts.append('  "agreement_reached": true/false,')
+        prompt_parts.append('  "agreement_terms": { "price": 650 } or null,')
+        prompt_parts.append('  "winner": "Agent A" or "Agent B" or "Both" or "Neither",')
+        prompt_parts.append('  "reasoning": "Detailed explanation of why agreement was/wasn\'t reached",')
+        prompt_parts.append('  "agent_a_satisfaction": "high/medium/low" (based on how close to their ideal),')
+        prompt_parts.append('  "agent_b_satisfaction": "high/medium/low"')
+        prompt_parts.append("}")
+        prompt_parts.append("")
+        prompt_parts.append("IMPORTANT:")
+        prompt_parts.append("- Only mark agreement_reached as true if BOTH agents explicitly agreed to the SAME terms")
+        prompt_parts.append("- Look for explicit acceptance like 'I accept', 'deal', 'agreed', 'sold'")
+        prompt_parts.append("- If agents are still negotiating or disagreeing, mark as false")
+        prompt_parts.append("- Extract the exact agreed price/terms if agreement was reached")
+        prompt_parts.append("")
+        prompt_parts.append("Your analysis (JSON only):")
+        
+        return "\n".join(prompt_parts)
+    
+    def _format_conversation(self, messages: List[Dict]) -> str:
+        """Format conversation messages for the prompt"""
+        lines = []
+        for msg in messages:
+            agent = msg.get("agent", "Unknown")
+            persona = msg.get("persona", "")
+            message = msg.get("message", "")
+            round_num = msg.get("round", 0)
+            
+            lines.append(f"[Round {round_num}] {agent} ({persona}):")
+            lines.append(f"  {message}")
+            lines.append("")
+        
+        return "\n".join(lines)
+    
+    def _call_llm(self, prompt: str) -> str:
+        """Call the LLM API"""
+        try:
+            if self.llm_provider == "openai":
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_model,
+                    messages=[
+                        {"role": "system", "content": "You are an expert negotiation adjudicator. Analyze negotiations objectively and provide detailed analysis in JSON format."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,  # Lower temperature for more consistent analysis
+                    max_tokens=500
+                )
+                return response.choices[0].message.content.strip()
+            
+            elif self.llm_provider == "anthropic":
+                response = self.llm_client.messages.create(
+                    model=self.llm_model,
+                    max_tokens=500,
+                    temperature=0.3,
+                    system="You are an expert negotiation adjudicator. Analyze negotiations objectively and provide detailed analysis in JSON format.",
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                return response.content[0].text.strip()
+        
+        except Exception as e:
+            return f'{{"error": "{str(e)}"}}'
+    
+    def _parse_analysis(self, analysis_text: str, scenario_type: str) -> Dict[str, Any]:
+        """Parse the LLM's analysis response"""
+        try:
+            # Try to extract JSON from the response
+            # Remove markdown code blocks if present
+            analysis_text = analysis_text.strip()
+            if analysis_text.startswith("```json"):
+                analysis_text = analysis_text[7:]
+            if analysis_text.startswith("```"):
+                analysis_text = analysis_text[3:]
+            if analysis_text.endswith("```"):
+                analysis_text = analysis_text[:-3]
+            analysis_text = analysis_text.strip()
+            
+            # Parse JSON
+            analysis = json.loads(analysis_text)
+            
+            # Validate required fields
+            if "agreement_reached" not in analysis:
+                analysis["agreement_reached"] = False
+            
+            return analysis
+        
+        except json.JSONDecodeError:
+            # Fallback: try to extract key information manually
+            return self._fallback_parse(analysis_text)
+    
+    def _fallback_parse(self, text: str) -> Dict[str, Any]:
+        """Fallback parsing if JSON parsing fails"""
+        text_lower = text.lower()
+        
+        # Try to detect agreement
+        agreement_reached = any(phrase in text_lower for phrase in [
+            "agreement reached", "deal was reached", "agreed", "successful negotiation"
+        ]) and not any(phrase in text_lower for phrase in [
+            "no agreement", "failed", "did not reach"
+        ])
+        
+        # Try to detect winner
+        winner = "Neither"
+        if "agent a" in text_lower and ("won" in text_lower or "benefited" in text_lower):
+            winner = "Agent A"
+        elif "agent b" in text_lower and ("won" in text_lower or "benefited" in text_lower):
+            winner = "Agent B"
+        elif "both" in text_lower and ("won" in text_lower or "benefited" in text_lower):
+            winner = "Both"
+        
+        return {
+            "agreement_reached": agreement_reached,
+            "winner": winner,
+            "reasoning": text[:500] if len(text) > 500 else text,
+            "agent_a_satisfaction": "medium",
+            "agent_b_satisfaction": "medium"
+        }
+    
+    def _extract_agreement_terms(
+        self,
+        messages: List[Dict],
+        scenario_type: str,
+        agent_a_secrets: Dict,
+        agent_b_secrets: Dict
+    ) -> Dict[str, Any]:
+        """Extract agreed-upon terms from the conversation"""
+        terms = {}
+        
+        if scenario_type == "price_negotiation":
+            # Look for price mentions in the last few messages
+            # Check for explicit agreement with price
+            for msg in reversed(messages[-6:]):  # Check last 6 messages
+                message = msg.get("message", "")
+                
+                # Look for dollar amounts
+                price_pattern = r'\$(\d+(?:\.\d{2})?)'
+                prices = re.findall(price_pattern, message)
+                
+                if prices:
+                    # Check if this message contains agreement language
+                    msg_lower = message.lower()
+                    if any(agree in msg_lower for agree in [
+                        "deal", "accept", "agree", "sold", "take it"
+                    ]):
+                        try:
+                            terms["price"] = float(prices[-1])
+                            break
+                        except ValueError:
+                            continue
+            
+            # If no explicit price found, look for numbers in context of agreement
+            if "price" not in terms:
+                for msg in reversed(messages[-4:]):
+                    message = msg.get("message", "")
+                    msg_lower = message.lower()
+                    
+                    if any(agree in msg_lower for agree in [
+                        "deal", "accept", "agree", "sold"
+                    ]):
+                        # Extract any 3-4 digit number (likely a price)
+                        numbers = re.findall(r'\b(\d{3,4})\b', message)
+                        if numbers:
+                            try:
+                                potential_price = float(numbers[-1])
+                                # Check if it's in reasonable range
+                                if 100 <= potential_price <= 10000:
+                                    terms["price"] = potential_price
+                                    break
+                            except ValueError:
+                                continue
+        
+        return terms

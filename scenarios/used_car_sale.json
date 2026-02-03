@@ -1,0 +1,41 @@
+{
+  "name": "Used Car Sale",
+  "description": "Agent A is selling a used car. Agent B wants to buy it. They must negotiate a price.",
+  "type": "price_negotiation",
+  "public_info": {
+    "item": "2018 Honda Civic",
+    "condition": "Good condition, 45,000 miles",
+    "features": ["Bluetooth", "Backup camera", "Sunroof"],
+    "visible_issues": "Minor scratches on rear bumper"
+  },
+  "agent_a_secrets": {
+    "role": "Seller",
+    "minimum_acceptable_price": 500,
+    "ideal_price": 700,
+    "urgency": "high",
+    "reason": "Need money fast for emergency expenses",
+    "willing_to_negotiate": true,
+    "bottom_line": "Will accept $500 if buyer pays cash today"
+  },
+  "agent_b_secrets": {
+    "role": "Buyer",
+    "maximum_budget": 1000,
+    "ideal_price": 600,
+    "urgency": "medium",
+    "reason": "Looking for reliable transportation, not in rush",
+    "willing_to_negotiate": true,
+    "bottom_line": "Won't pay more than $800, prefers $600-650"
+  },
+  "market_value": {
+    "fair_price_range": {
+      "min": 600,
+      "max": 750,
+      "average": 675
+    },
+    "currency": "USD"
+  },
+  "agreement_criteria": {
+    "success_condition": "Both agents agree on a price within their acceptable ranges",
+    "failure_condition": "No agreement reached after maximum rounds or agents walk away"
+  }
+}
