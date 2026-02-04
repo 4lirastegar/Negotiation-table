@@ -4,6 +4,7 @@ Handles LLM integration and message generation for negotiation agents
 """
 
 import os
+import re
 from typing import Dict, List, Optional, Any
 from config.config import OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_PROVIDER, LLM_MODEL
 from personas.persona_manager import PersonaManager
@@ -49,6 +50,7 @@ class Agent:
         self.conversation_history: List[Dict[str, str]] = []
         self.proposals_made: List[Any] = []
         self.round_count = 0
+        self.my_price_offers: List[float] = []  # Track price offers for consistency
         
         # Validate persona exists
         if not self.persona_manager.configs.persona_exists(persona_name):
@@ -96,11 +98,18 @@ class Agent:
             scenario_public_info=self.scenario_public_info,
             agent_secrets=self.agent_secrets,
             conversation_history=history,
-            round_number=len(history) + 1
+            round_number=len(history) + 1,
+            agent_id=self.agent_id,
+            my_previous_offers=self.my_price_offers
         )
         
         # Generate message using LLM
         message = self._call_llm(prompt)
+        
+        # Extract price offer from the message and track it
+        price_offer = self._extract_price_from_message(message)
+        if price_offer is not None:
+            self.my_price_offers.append(price_offer)
         
         # Track the message
         self.round_count += 1
@@ -171,11 +180,41 @@ class Agent:
         """
         return self.conversation_history.copy()
     
+    def _extract_price_from_message(self, message: str) -> Optional[float]:
+        """
+        Extract a price value from a message
+        
+        Args:
+            message: The message text
+            
+        Returns:
+            Price as float, or None if no price found
+        """
+        # Look for price patterns like $700, $1,200, 700, etc.
+        patterns = [
+            r'\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)',  # $700, $1,200.50
+            r'(\d+(?:,\d{3})*(?:\.\d{2})?)\s*dollars?',  # 700 dollars
+            r'(?:at|for|offer|price|pay)\s+\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)',  # at $700, for 700
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, message, re.IGNORECASE)
+            if matches:
+                # Clean and convert to float
+                price_str = matches[0].replace(',', '')
+                try:
+                    return float(price_str)
+                except ValueError:
+                    continue
+        
+        return None
+    
     def reset(self):
         """Reset agent state for a new negotiation"""
         self.conversation_history = []
         self.proposals_made = []
         self.round_count = 0
+        self.my_price_offers = []
     
     def calculate_utility(self, agreement_terms: Dict) -> float:
         """

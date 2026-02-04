@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from agents.agent import Agent
 from agents.judge import Judge
 from utils.scenario_loader import ScenarioLoader
+from utils.mongodb_client import get_mongodb_client
 from config.config import MAX_ROUNDS
 
 
@@ -191,7 +192,8 @@ class NegotiationEngine:
         agent_b_persona: str,
         max_rounds: int = None,
         llm_provider: str = None,
-        llm_model: str = None
+        llm_model: str = None,
+        save_to_db: bool = True
     ) -> Dict[str, Any]:
         """
         Complete simulation: create agents and run negotiation
@@ -203,6 +205,7 @@ class NegotiationEngine:
             max_rounds: Maximum rounds
             llm_provider: LLM provider override
             llm_model: LLM model override
+            save_to_db: Whether to save results to MongoDB
             
         Returns:
             Negotiation results dictionary
@@ -226,5 +229,22 @@ class NegotiationEngine:
         # Add scenario info to results
         results["scenario_name"] = scenario_name
         results["scenario_type"] = scenario_type
+        results["agent_a_persona"] = agent_a_persona
+        results["agent_b_persona"] = agent_b_persona
+        
+        # Save to MongoDB if requested
+        if save_to_db:
+            try:
+                mongodb = get_mongodb_client()
+                doc_id = mongodb.save_negotiation(
+                    scenario_name=scenario_name,
+                    agent_a_persona=agent_a_persona,
+                    agent_b_persona=agent_b_persona,
+                    results=results
+                )
+                results["_id"] = doc_id
+            except Exception as e:
+                print(f"Warning: Could not save to MongoDB: {e}")
+                # Don't fail the simulation if MongoDB save fails
         
         return results

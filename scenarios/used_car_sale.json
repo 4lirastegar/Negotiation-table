@@ -10,21 +10,15 @@
   },
   "agent_a_secrets": {
     "role": "Seller",
-    "minimum_acceptable_price": 500,
-    "ideal_price": 700,
-    "urgency": "high",
-    "reason": "Need money fast for emergency expenses",
-    "willing_to_negotiate": true,
-    "bottom_line": "Will accept $500 if buyer pays cash today"
+    "minimum_acceptable_price": 600,
+    "ideal_price": 750,
+    "urgency": "medium"
   },
   "agent_b_secrets": {
     "role": "Buyer",
-    "maximum_budget": 1000,
-    "ideal_price": 600,
-    "urgency": "medium",
-    "reason": "Looking for reliable transportation, not in rush",
-    "willing_to_negotiate": true,
-    "bottom_line": "Won't pay more than $800, prefers $600-650"
+    "maximum_budget": 800,
+    "ideal_price": 650,
+    "urgency": "medium"
   },
   "market_value": {
     "fair_price_range": {
