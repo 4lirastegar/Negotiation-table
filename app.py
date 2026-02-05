@@ -8,59 +8,76 @@ from utils.scenario_loader import ScenarioLoader
 from personas.persona_configs import PersonaConfigs
 from utils.mongodb_client import get_mongodb_client
 
-# Custom CSS for chat bubbles
+# Custom CSS for better UI
 st.markdown("""
 <style>
-    .chat-message {
+    /* Fix message text font and styling - WHITE TEXT */
+    .stAlert p {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.7 !important;
+        color: #FFFFFF !important;
+        font-weight: 400 !important;
+        margin: 0 !important;
+    }
+    
+    /* Agent A (info boxes) - Blue background with white text */
+    .stAlert[data-baseweb="notification"] {
+        background-color: #2563EB !important;
+        border: none !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Make info and success boxes prettier */
+    .stAlert > div {
+        padding: 1.25rem 1.5rem !important;
+        border-radius: 0.75rem !important;
+    }
+    
+    /* Success boxes (Agent B) - Green background with white text */
+    div[data-baseweb="notification"][kind="success"] {
+        background-color: #059669 !important;
+    }
+    
+    /* Prompt viewer styling */
+    .prompt-viewer {
+        background-color: #F9FAFB;
+        border: 1px solid #E5E7EB;
+        border-radius: 0.375rem;
         padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: flex-start;
-    }
-    .chat-message.user {
-        background-color: #E3F2FD;
-        margin-left: 20%;
-    }
-    .chat-message.assistant {
-        background-color: #F1F8E9;
-        margin-right: 20%;
-    }
-    .avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        margin-right: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        font-weight: bold;
-    }
-    .message-content {
-        flex: 1;
-    }
-    .message-header {
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-        font-size: 0.9rem;
-    }
-    .message-text {
-        font-size: 1rem;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
         line-height: 1.5;
+        color: #374151;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    /* Expander text styling */
+    .streamlit-expanderHeader {
+        font-size: 14px !important;
+        color: #6B7280 !important;
+    }
+    
+    /* Better spacing */
+    .element-container {
+        margin-bottom: 0.5rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 def display_chat_messages(messages):
-    """Display messages in a chat bubble format"""
-    for msg in messages:
+    """Display messages in a chat bubble format with prompt viewer"""
+    for idx, msg in enumerate(messages):
         agent = msg.get('agent', 'Unknown')
         persona = msg.get('persona', '')
         message = msg.get('message', '')
         round_num = msg.get('round', 0)
         msg_type = msg.get('type', 'message')
+        prompt = msg.get('prompt', None)
         
         # Determine avatar and styling
         if agent == "Agent A":
@@ -85,16 +102,28 @@ def display_chat_messages(messages):
                     with col2:
                         # Header
                         st.markdown(f"**{avatar} {agent}** ({persona}) • Round {round_num}")
+                        
                         # Message bubble
                         st.info(message)
+                        
+                        # Show prompt in collapsed expander (no button needed!)
+                        if prompt:
+                            with st.expander("🔍 View Prompt", expanded=False):
+                                st.code(prompt, language=None)
                 else:
                     # Agent B messages on the left
                     col1, col2 = st.columns([5, 2])
                     with col1:
                         # Header
                         st.markdown(f"**{avatar} {agent}** ({persona}) • Round {round_num}")
+                        
                         # Message bubble
                         st.success(message)
+                        
+                        # Show prompt in collapsed expander (no button needed!)
+                        if prompt:
+                            with st.expander("🔍 View Prompt", expanded=False):
+                                st.code(prompt, language=None)
                     with col2:
                         st.write("")  # Spacer
                 

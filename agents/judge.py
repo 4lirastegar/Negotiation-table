@@ -1,12 +1,63 @@
 """
 Judge/Adjudicator System
 Analyzes negotiation transcripts to determine outcomes, agreements, and winners
+Uses OpenAI Structured Outputs for guaranteed valid JSON responses
 """
 
 from typing import Dict, List, Any, Optional
 from config.config import OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_PROVIDER, LLM_MODEL
 import json
 import re
+
+# Define the JSON schema for structured outputs (like your FishGPT!)
+JUDGE_ANALYSIS_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "negotiation_analysis",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "agreement_reached": {
+                    "type": "boolean",
+                    "description": "Whether both agents reached a mutual agreement"
+                },
+                "agreement_terms": {
+                    "type": "object",
+                    "properties": {
+                        "price": {
+                            "type": "number",
+                            "description": "The agreed upon price in dollars"
+                        }
+                    },
+                    "required": ["price"],
+                    "additionalProperties": False
+                },
+                "winner": {
+                    "type": "string",
+                    "description": "Who benefited more: 'Agent A', 'Agent B', 'Both', or 'Neither'",
+                    "enum": ["Agent A", "Agent B", "Both", "Neither"]
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": "Detailed explanation of why agreement was/wasn't reached and who won"
+                },
+                "agent_a_satisfaction": {
+                    "type": "string",
+                    "description": "How satisfied Agent A is with the outcome",
+                    "enum": ["high", "medium", "low"]
+                },
+                "agent_b_satisfaction": {
+                    "type": "string",
+                    "description": "How satisfied Agent B is with the outcome",
+                    "enum": ["high", "medium", "low"]
+                }
+            },
+            "required": ["agreement_reached", "winner", "reasoning", "agent_a_satisfaction", "agent_b_satisfaction"],
+            "additionalProperties": False
+        }
+    }
+}
 
 
 class Judge:
@@ -21,7 +72,18 @@ class Judge:
             llm_model: Model name to use
         """
         self.llm_provider = llm_provider or LLM_PROVIDER
-        self.llm_model = llm_model or LLM_MODEL
+        
+        # For Judge, we need a model that supports structured outputs
+        # Use gpt-4o if available, otherwise use the configured model
+        if llm_model:
+            self.llm_model = llm_model
+        elif LLM_MODEL in ["gpt-4-turbo", "gpt-4"]:
+            # These models don't support structured outputs, use gpt-4o instead
+            self.llm_model = "gpt-4o"
+            print("⚠️ Judge: Using gpt-4o for structured outputs support")
+        else:
+            self.llm_model = LLM_MODEL
+        
         self.llm_client = self._initialize_llm_client()
     
     def _initialize_llm_client(self):
@@ -175,24 +237,34 @@ class Judge:
         return "\n".join(lines)
     
     def _call_llm(self, prompt: str) -> str:
-        """Call the LLM API"""
+        """Call the LLM API with structured outputs (like FishGPT!)"""
         try:
             if self.llm_provider == "openai":
+                # Use structured outputs for guaranteed valid JSON!
                 response = self.llm_client.chat.completions.create(
                     model=self.llm_model,
+                    temperature=0,  # 0 = deterministic for consistency
                     messages=[
-                        {"role": "system", "content": "You are an expert negotiation adjudicator. Analyze negotiations objectively and provide detailed analysis in JSON format."},
-                        {"role": "user", "content": prompt}
+                        {
+                            "role": "system",
+                            "content": "You are an expert negotiation adjudicator. Analyze negotiations objectively and provide structured analysis."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
                     ],
-                    temperature=0.3,  # Lower temperature for more consistent analysis
-                    max_tokens=500
+                    response_format=JUDGE_ANALYSIS_SCHEMA,  # Structured output!
+                    max_tokens=1000
                 )
+                # JSON is guaranteed to be valid!
                 return response.choices[0].message.content.strip()
             
             elif self.llm_provider == "anthropic":
+                # Anthropic doesn't support structured outputs yet, use regular JSON mode
                 response = self.llm_client.messages.create(
                     model=self.llm_model,
-                    max_tokens=500,
+                    max_tokens=1000,
                     temperature=0.3,
                     system="You are an expert negotiation adjudicator. Analyze negotiations objectively and provide detailed analysis in JSON format.",
                     messages=[
@@ -205,30 +277,21 @@ class Judge:
             return f'{{"error": "{str(e)}"}}'
     
     def _parse_analysis(self, analysis_text: str, scenario_type: str) -> Dict[str, Any]:
-        """Parse the LLM's analysis response"""
+        """Parse the LLM's analysis response - much simpler with structured outputs!"""
         try:
-            # Try to extract JSON from the response
-            # Remove markdown code blocks if present
-            analysis_text = analysis_text.strip()
-            if analysis_text.startswith("```json"):
-                analysis_text = analysis_text[7:]
-            if analysis_text.startswith("```"):
-                analysis_text = analysis_text[3:]
-            if analysis_text.endswith("```"):
-                analysis_text = analysis_text[:-3]
-            analysis_text = analysis_text.strip()
-            
-            # Parse JSON
+            # With structured outputs, JSON is GUARANTEED to be valid!
+            # No need for markdown stripping or fallback parsing
             analysis = json.loads(analysis_text)
             
-            # Validate required fields
+            # Validate required fields (though schema guarantees them)
             if "agreement_reached" not in analysis:
                 analysis["agreement_reached"] = False
             
             return analysis
         
         except json.JSONDecodeError:
-            # Fallback: try to extract key information manually
+            # This should rarely happen with structured outputs
+            # But keep fallback just in case
             return self._fallback_parse(analysis_text)
     
     def _fallback_parse(self, text: str) -> Dict[str, Any]:
@@ -298,18 +361,33 @@ class Judge:
                     msg_lower = message.lower()
                     
                     if any(agree in msg_lower for agree in [
-                        "deal", "accept", "agree", "sold"
+                        "deal", "accept", "agree", "sold", "finalize"
                     ]):
-                        # Extract any 3-4 digit number (likely a price)
-                        numbers = re.findall(r'\b(\d{3,4})\b', message)
-                        if numbers:
+                        # Look for prices in context (with $ or words like "at" or "for")
+                        # Avoid matching years or model numbers
+                        context_prices = re.findall(r'(?:at|for|of|price|pay|offer)\s+\$?(\d{3,4})\b', message, re.IGNORECASE)
+                        
+                        if context_prices:
                             try:
-                                potential_price = float(numbers[-1])
+                                potential_price = float(context_prices[-1])
                                 # Check if it's in reasonable range
                                 if 100 <= potential_price <= 10000:
                                     terms["price"] = potential_price
                                     break
                             except ValueError:
                                 continue
+                        else:
+                            # If no context price found, try all numbers but exclude "2018" etc
+                            all_numbers = re.findall(r'\b(\d{3,4})\b', message)
+                            # Filter out year-like numbers (2000-2030 range)
+                            filtered_numbers = [n for n in all_numbers if not (2000 <= int(n) <= 2030)]
+                            if filtered_numbers:
+                                try:
+                                    potential_price = float(filtered_numbers[-1])
+                                    if 100 <= potential_price <= 10000:
+                                        terms["price"] = potential_price
+                                        break
+                                except ValueError:
+                                    continue
         
         return terms

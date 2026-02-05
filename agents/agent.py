@@ -51,6 +51,7 @@ class Agent:
         self.proposals_made: List[Any] = []
         self.round_count = 0
         self.my_price_offers: List[float] = []  # Track price offers for consistency
+        self.last_prompt: str = ""  # Store the last prompt sent to LLM
         
         # Validate persona exists
         if not self.persona_manager.configs.persona_exists(persona_name):
@@ -102,6 +103,9 @@ class Agent:
             agent_id=self.agent_id,
             my_previous_offers=self.my_price_offers
         )
+        
+        # Store the prompt for debugging/display
+        self.last_prompt = prompt
         
         # Generate message using LLM
         message = self._call_llm(prompt)
@@ -215,6 +219,7 @@ class Agent:
         self.proposals_made = []
         self.round_count = 0
         self.my_price_offers = []
+        self.last_prompt = ""
     
     def calculate_utility(self, agreement_terms: Dict) -> float:
         """

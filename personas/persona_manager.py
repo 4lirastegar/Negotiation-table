@@ -62,137 +62,80 @@ class PersonaManager:
         if not persona:
             raise ValueError(f"Persona '{persona_name}' not found")
         
-        # Build the prompt sections
+        # Build the prompt sections - MINIMAL GOAL-ORIENTED APPROACH
         prompt_parts = []
         
-        # 0. YOUR ROLE (most important - put first!)
         role = agent_secrets.get("role", "Unknown")
+        
+        # 1. Role and Goal (Clear but not prescriptive)
         prompt_parts.append("=" * 60)
-        prompt_parts.append("⚠️ CRITICAL: YOUR ROLE ⚠️")
+        prompt_parts.append(f"YOUR ROLE: {role.upper()}")
         prompt_parts.append("=" * 60)
+        
         if role == "Seller":
-            prompt_parts.append("YOU ARE THE SELLER.")
-            prompt_parts.append("")
-            prompt_parts.append("IMPORTANT RULES:")
-            prompt_parts.append("- You want to SELL the item for the HIGHEST price possible")
-            prompt_parts.append("- You START with a HIGH asking price (your ideal price)")
-            prompt_parts.append("- You negotiate DOWNWARD only if the buyer won't accept your price")
-            prompt_parts.append("- NEVER offer a price LOWER than what the buyer is offering")
-            prompt_parts.append("- If buyer offers $650, you should counter with $700 or higher, NOT lower")
-            prompt_parts.append("")
-            prompt_parts.append("EXAMPLE: If buyer offers $650, you say: 'I can do $700' or 'How about $680'")
-            prompt_parts.append("WRONG: If buyer offers $650, you say: 'I can do $500' (this is backwards!)")
+            prompt_parts.append("You are selling the item described below.")
+            prompt_parts.append("Your goal: Sell for the HIGHEST price possible within your acceptable range.")
         elif role == "Buyer":
-            prompt_parts.append("YOU ARE THE BUYER.")
-            prompt_parts.append("")
-            prompt_parts.append("IMPORTANT RULES:")
-            prompt_parts.append("- You want to BUY the item for the LOWEST price possible")
-            prompt_parts.append("- You START with a LOW offer (below your ideal price)")
-            prompt_parts.append("- You negotiate UPWARD only if the seller won't accept your price")
-            prompt_parts.append("- NEVER offer a price HIGHER than what the seller is offering")
-            prompt_parts.append("- If seller offers $700, you should counter with $600 or lower, NOT higher")
-            prompt_parts.append("")
-            prompt_parts.append("EXAMPLE: If seller offers $700, you say: 'I can do $600' or 'How about $650'")
-            prompt_parts.append("WRONG: If seller offers $700, you say: 'I can do $800' (this is backwards!)")
+            prompt_parts.append("You are buying the item described below.")
+            prompt_parts.append("Your goal: Buy for the LOWEST price possible within your acceptable range.")
         else:
             prompt_parts.append(f"You are the {role}.")
         prompt_parts.append("")
-        prompt_parts.append("=" * 60)
-        prompt_parts.append("")
         
-        # 1. Persona instructions
-        prompt_parts.append("=" * 60)
-        prompt_parts.append("YOUR PERSONALITY AND NEGOTIATION STYLE:")
-        prompt_parts.append("=" * 60)
-        prompt_parts.append(persona.get("prompt_addition", ""))
-        prompt_parts.append("")
+        # 2. Personality (minimal)
+        if persona.get("prompt_addition"):
+            prompt_parts.append(persona.get("prompt_addition"))
+            prompt_parts.append("")
         
-        # 2. Scenario context
+        # 3. Negotiation Context
         prompt_parts.append("=" * 60)
-        prompt_parts.append("NEGOTIATION SCENARIO:")
+        prompt_parts.append("NEGOTIATION CONTEXT:")
         prompt_parts.append("=" * 60)
         prompt_parts.append(self._format_public_info(scenario_public_info))
         prompt_parts.append("")
         
-        # 3. Your private information
+        # 4. Your Constraints (private info)
         prompt_parts.append("=" * 60)
-        prompt_parts.append("YOUR PRIVATE INFORMATION (DO NOT REVEAL DIRECTLY):")
+        prompt_parts.append("YOUR CONSTRAINTS:")
         prompt_parts.append("=" * 60)
         prompt_parts.append(self._format_agent_secrets(agent_secrets))
         prompt_parts.append("")
-        prompt_parts.append("IMPORTANT: Use this information to guide your negotiation, but don't reveal it directly unless strategically beneficial.")
+        prompt_parts.append("Note: Use this information strategically. You may choose whether to reveal it.")
         prompt_parts.append("")
         
-        # 4. YOUR PREVIOUS OFFERS (Track consistency!)
+        # 5. Previous offers (for consistency tracking)
         if my_previous_offers and len(my_previous_offers) > 0:
             prompt_parts.append("=" * 60)
-            prompt_parts.append("⚠️ YOUR PREVIOUS PRICE OFFERS ⚠️")
+            prompt_parts.append("YOUR PREVIOUS OFFERS:")
             prompt_parts.append("=" * 60)
-            prompt_parts.append("You have made the following price offers in this negotiation:")
             for i, offer in enumerate(my_previous_offers, 1):
                 prompt_parts.append(f"  Round {i}: ${offer:.2f}")
             prompt_parts.append("")
-            prompt_parts.append("🚨 CRITICAL CONSISTENCY RULE 🚨")
+            # Minimal consistency constraint
             if role == "Seller":
-                if my_previous_offers:
-                    lowest_offer = min(my_previous_offers)
-                    prompt_parts.append(f"You are the SELLER. Your lowest offer so far is ${lowest_offer:.2f}")
-                    prompt_parts.append(f"You MUST NOT offer a price LOWER than ${lowest_offer:.2f}")
-                    prompt_parts.append(f"You can only offer ${lowest_offer:.2f} or HIGHER")
-                    prompt_parts.append(f"If you want to make a concession, offer between ${lowest_offer:.2f} and ${max(my_previous_offers):.2f}")
+                prompt_parts.append(f"Note: As the seller, your offers typically decrease as you make concessions.")
             elif role == "Buyer":
-                if my_previous_offers:
-                    highest_offer = max(my_previous_offers)
-                    prompt_parts.append(f"You are the BUYER. Your highest offer so far is ${highest_offer:.2f}")
-                    prompt_parts.append(f"You MUST NOT offer a price HIGHER than ${highest_offer:.2f}")
-                    prompt_parts.append(f"You can only offer ${highest_offer:.2f} or LOWER")
-                    prompt_parts.append(f"If you want to make a concession, offer between ${min(my_previous_offers):.2f} and ${highest_offer:.2f}")
-            prompt_parts.append("")
-            prompt_parts.append("=" * 60)
+                prompt_parts.append(f"Note: As the buyer, your offers typically increase as you make concessions.")
             prompt_parts.append("")
         
-        # 5. Conversation history
+        # 6. Conversation history
         if conversation_history:
             prompt_parts.append("=" * 60)
-            prompt_parts.append("⚠️ CONVERSATION HISTORY - READ THIS CAREFULLY ⚠️")
+            prompt_parts.append(f"CONVERSATION HISTORY (Round {round_number}):")
             prompt_parts.append("=" * 60)
-            prompt_parts.append("The other party has been negotiating with you. You MUST respond to what they just said.")
-            prompt_parts.append("Do NOT just repeat your own position - actually negotiate!")
-            prompt_parts.append("")
             prompt_parts.append(self._format_conversation_history(conversation_history, current_agent_id=agent_id))
-            prompt_parts.append("")
-            prompt_parts.append("⚠️ IMPORTANT: Look at what the other party just said in the last message above.")
-            prompt_parts.append("You MUST respond to their specific offer/statement, not just repeat your position.")
-            prompt_parts.append("")
         
-        # 6. Current instructions
+        # 7. Task (simple and clear)
         prompt_parts.append("=" * 60)
         prompt_parts.append("YOUR TASK:")
         prompt_parts.append("=" * 60)
-        prompt_parts.append(f"This is round {round_number} of the negotiation.")
-        prompt_parts.append("")
-        if role == "Seller":
-            prompt_parts.append("⚠️ REMINDER: You are the SELLER. You want HIGHER prices. If the buyer offers $650, you counter with $700 or higher, NOT lower!")
-        elif role == "Buyer":
-            prompt_parts.append("⚠️ REMINDER: You are the BUYER. You want LOWER prices. If the seller offers $700, you counter with $600 or lower, NOT higher!")
-        prompt_parts.append("")
         if conversation_history:
-            prompt_parts.append("⚠️ CRITICAL: The other party just made a statement/offer in the conversation above.")
-            prompt_parts.append("You MUST:")
-            prompt_parts.append("1. Acknowledge what they just said")
-            prompt_parts.append("2. Respond to their specific offer/statement")
-            prompt_parts.append("3. Make a NEW counter-offer (not just repeat your old position)")
-            prompt_parts.append("4. Show you're actually negotiating (move your price, make a compromise)")
-            prompt_parts.append("")
-            prompt_parts.append("DO NOT just say 'I appreciate your offer but I'm sticking to $700' - that's not negotiating!")
-            prompt_parts.append("Instead, say something like 'I appreciate your offer of $600. How about we meet at $650?'")
-            prompt_parts.append("")
-        prompt_parts.append("Generate your next message in the negotiation.")
-        prompt_parts.append("Be true to your personality and negotiation style.")
-        prompt_parts.append("Keep your message concise (1-3 sentences typically).")
-        prompt_parts.append("Do NOT include 'Agent A:' or 'Agent B:' in your message - just write what you would say.")
+            prompt_parts.append("Read the conversation above and respond to the other party's latest message.")
+            prompt_parts.append("Continue negotiating toward an agreement that maximizes your outcome.")
+        else:
+            prompt_parts.append("Begin the negotiation. Make your opening statement.")
         prompt_parts.append("")
-        prompt_parts.append("Your message:")
+        prompt_parts.append("Your response (do not include labels like 'Agent A:' or 'Seller:'):")
         
         return "\n".join(prompt_parts)
     
