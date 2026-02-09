@@ -23,15 +23,23 @@ JUDGE_ANALYSIS_SCHEMA = {
                     "description": "Whether both agents reached a mutual agreement"
                 },
                 "agreement_terms": {
-                    "type": "object",
-                    "properties": {
-                        "price": {
-                            "type": "number",
-                            "description": "The agreed upon price in dollars"
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "price": {
+                                    "type": "number",
+                                    "description": "The agreed upon price in dollars"
+                                }
+                            },
+                            "required": ["price"],
+                            "additionalProperties": False
+                        },
+                        {
+                            "type": "null"
                         }
-                    },
-                    "required": ["price"],
-                    "additionalProperties": False
+                    ],
+                    "description": "The agreed upon terms (price), or null if no agreement"
                 },
                 "winner": {
                     "type": "string",
@@ -53,7 +61,38 @@ JUDGE_ANALYSIS_SCHEMA = {
                     "enum": ["high", "medium", "low"]
                 }
             },
-            "required": ["agreement_reached", "winner", "reasoning", "agent_a_satisfaction", "agent_b_satisfaction"],
+            "required": ["agreement_reached", "agreement_terms", "winner", "reasoning", "agent_a_satisfaction", "agent_b_satisfaction"],
+            "additionalProperties": False
+        }
+    }
+}
+
+# Lightweight schema for quick agreement checking during negotiation
+QUICK_AGREEMENT_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "quick_agreement_check",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "agreement_reached": {
+                    "type": "boolean",
+                    "description": "Whether both agents explicitly agreed to the same terms"
+                },
+                "agreed_price": {
+                    "anyOf": [
+                        {"type": "number"},
+                        {"type": "null"}
+                    ],
+                    "description": "The agreed price, or null if no agreement"
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "Brief explanation of why agreement was or wasn't reached"
+                }
+            },
+            "required": ["agreement_reached", "agreed_price", "explanation"],
             "additionalProperties": False
         }
     }
@@ -108,6 +147,77 @@ class Judge:
         
         else:
             raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
+    
+    def check_agreement_quick(
+        self,
+        message_a: str,
+        message_b: str,
+        round_num: int
+    ) -> Dict[str, Any]:
+        """
+        Quick check if agreement was reached in the last round
+        Uses lightweight structured output for speed
+        
+        Args:
+            message_a: Agent A's most recent message
+            message_b: Agent B's most recent message
+            round_num: Current round number
+            
+        Returns:
+            Dictionary with agreement_reached (bool), agreed_price (float or None), explanation (str)
+        """
+        # Build quick check prompt
+        prompt = f"""You are a negotiation referee. Analyze these two messages from a negotiation round and determine if BOTH agents explicitly agreed to the SAME terms.
+
+ROUND {round_num}:
+
+Agent A: "{message_a}"
+
+Agent B: "{message_b}"
+
+RULES:
+- Only return TRUE if BOTH agents explicitly agreed to the SAME price
+- Look for phrases like "I agree to $X", "I accept $X", "deal at $X", "let's finalize at $X"
+- If one agent proposes and the other accepts the SAME price → TRUE
+- If agents are still counter-offering different prices → FALSE
+- If agents are discussing logistics after agreement → still TRUE
+
+Return your analysis in JSON format."""
+
+        try:
+            if self.llm_provider == "openai":
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_model,
+                    temperature=0.1,
+                    messages=[
+                        {"role": "system", "content": "You are an expert negotiation referee. Be strict: only confirm agreement when BOTH agents explicitly accept the SAME terms."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format=QUICK_AGREEMENT_SCHEMA,
+                    max_tokens=150
+                )
+                result = json.loads(response.choices[0].message.content.strip())
+                return result
+            
+            elif self.llm_provider == "anthropic":
+                # Anthropic doesn't support structured outputs, use basic parsing
+                response = self.llm_client.messages.create(
+                    model=self.llm_model,
+                    max_tokens=150,
+                    temperature=0.1,
+                    system="You are an expert negotiation referee. Return only valid JSON.",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                result = json.loads(response.content[0].text.strip())
+                return result
+                
+        except Exception as e:
+            print(f"Quick agreement check error: {e}")
+            return {
+                "agreement_reached": False,
+                "agreed_price": None,
+                "explanation": f"Error during check: {str(e)}"
+            }
     
     def analyze_negotiation(
         self,

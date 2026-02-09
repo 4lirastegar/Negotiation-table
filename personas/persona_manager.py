@@ -1,7 +1,4 @@
-"""
-Persona Manager
-Manages persona integration with agent prompts
-"""
+
 
 from typing import Dict, List, Optional
 from .persona_configs import PersonaConfigs
@@ -103,29 +100,14 @@ class PersonaManager:
         prompt_parts.append("Note: Use this information strategically. You may choose whether to reveal it.")
         prompt_parts.append("")
         
-        # 5. Previous offers (for consistency tracking)
-        if my_previous_offers and len(my_previous_offers) > 0:
-            prompt_parts.append("=" * 60)
-            prompt_parts.append("YOUR PREVIOUS OFFERS:")
-            prompt_parts.append("=" * 60)
-            for i, offer in enumerate(my_previous_offers, 1):
-                prompt_parts.append(f"  Round {i}: ${offer:.2f}")
-            prompt_parts.append("")
-            # Minimal consistency constraint
-            if role == "Seller":
-                prompt_parts.append(f"Note: As the seller, your offers typically decrease as you make concessions.")
-            elif role == "Buyer":
-                prompt_parts.append(f"Note: As the buyer, your offers typically increase as you make concessions.")
-            prompt_parts.append("")
-        
-        # 6. Conversation history
+        # 5. Conversation history
         if conversation_history:
             prompt_parts.append("=" * 60)
             prompt_parts.append(f"CONVERSATION HISTORY (Round {round_number}):")
             prompt_parts.append("=" * 60)
             prompt_parts.append(self._format_conversation_history(conversation_history, current_agent_id=agent_id))
         
-        # 7. Task (simple and clear)
+        # 6. Task (simple and clear)
         prompt_parts.append("=" * 60)
         prompt_parts.append("YOUR TASK:")
         prompt_parts.append("=" * 60)

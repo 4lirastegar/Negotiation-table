@@ -8,23 +8,23 @@ from utils.scenario_loader import ScenarioLoader
 from personas.persona_configs import PersonaConfigs
 from utils.mongodb_client import get_mongodb_client
 
-# Custom CSS for better UI
+# Custom CSS for better UI (Light Mode Optimized)
 st.markdown("""
 <style>
-    /* Fix message text font and styling - WHITE TEXT */
+    /* Fix message text font and styling - DARK TEXT for light mode */
     .stAlert p {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
         font-size: 16px !important;
         line-height: 1.7 !important;
-        color: #FFFFFF !important;
+        color: #1F2937 !important;  /* Dark gray text for readability */
         font-weight: 400 !important;
         margin: 0 !important;
     }
     
-    /* Agent A (info boxes) - Blue background with white text */
+    /* Agent A (info boxes) - Light blue background with dark text */
     .stAlert[data-baseweb="notification"] {
-        background-color: #2563EB !important;
-        border: none !important;
+        background-color: #DBEAFE !important;  /* Light blue */
+        border: 1px solid #93C5FD !important;   /* Blue border */
         box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
     }
     
@@ -34,9 +34,10 @@ st.markdown("""
         border-radius: 0.75rem !important;
     }
     
-    /* Success boxes (Agent B) - Green background with white text */
+    /* Success boxes (Agent B) - Light green background with dark text */
     div[data-baseweb="notification"][kind="success"] {
-        background-color: #059669 !important;
+        background-color: #D1FAE5 !important;  /* Light green */
+        border-color: #6EE7B7 !important;      /* Green border */
     }
     
     /* Prompt viewer styling */

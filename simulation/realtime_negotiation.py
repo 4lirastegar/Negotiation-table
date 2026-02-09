@@ -1,63 +1,21 @@
 """
 Real-time Negotiation Runner
 Yields messages as they're generated for real-time display
+
+JUDGE AS REAL-TIME REFEREE:
+- After each round, Judge checks if agreement was reached
+- If Judge confirms agreement → stop negotiation
+- If no agreement → continue to next round
+- Pure LLM-based detection, no hard-coded rules
 """
 
-import re
 import uuid
-from typing import Dict, Any, Generator, Optional, Tuple
+from typing import Dict, Any, Generator
 from agents.agent import Agent
 from agents.judge import Judge
 from utils.scenario_loader import ScenarioLoader
 from utils.mongodb_client import get_mongodb_client
 from config.config import MAX_ROUNDS
-
-
-def detect_mutual_agreement(message_a: str, message_b: str) -> Tuple[bool, Optional[float]]:
-    """
-    Check if both agents are agreeing to the same price
-    
-    Args:
-        message_a: Agent A's message
-        message_b: Agent B's message
-        
-    Returns:
-        Tuple of (agreement_reached, agreed_price)
-    """
-    # Keywords indicating agreement
-    agreement_keywords = [
-        r"(let'?s|i'?m ready to|i'?m prepared to|willing to|agree to|accept|finalize|seal|close|deal)",
-        r"(finalize.*deal|close.*deal|move forward|ready to proceed)"
-    ]
-    
-    # Check if both messages contain agreement language
-    has_agreement_a = any(re.search(pattern, message_a.lower()) for pattern in agreement_keywords)
-    has_agreement_b = any(re.search(pattern, message_b.lower()) for pattern in agreement_keywords)
-    
-    if not (has_agreement_a and has_agreement_b):
-        return False, None
-    
-    # Extract prices from both messages
-    price_pattern = r'\$?\s*(\d+(?:\.\d{2})?)'
-    prices_a = re.findall(price_pattern, message_a)
-    prices_b = re.findall(price_pattern, message_b)
-    
-    if not prices_a or not prices_b:
-        return False, None
-    
-    # Get the last mentioned price from each message
-    try:
-        price_a = float(prices_a[-1])
-        price_b = float(prices_b[-1])
-        
-        # Check if they agree on the same price (within $1 tolerance)
-        if abs(price_a - price_b) <= 1.0:
-            agreed_price = (price_a + price_b) / 2
-            return True, agreed_price
-    except (ValueError, IndexError):
-        pass
-    
-    return False, None
 
 
 def run_negotiation_realtime(
@@ -89,8 +47,11 @@ def run_negotiation_realtime(
     # Track negotiation
     messages = []
     round_count = 0
-    early_agreement = False
-    early_agreement_price = None
+    agreement_detected = False
+    agreed_price = None
+    
+    # Initialize Judge for real-time refereeing
+    judge = Judge()
     
     # Negotiation loop
     for round_num in range(1, max_rounds + 1):
@@ -160,21 +121,32 @@ def run_negotiation_realtime(
             yield error_msg
             break
         
-        # Check for mutual agreement after both agents have spoken
-        agreement_detected, agreed_price = detect_mutual_agreement(message_a, message_b)
-        if agreement_detected:
-            early_agreement = True
-            early_agreement_price = agreed_price
+        # Ask Judge: Did they reach agreement this round?
+        yield {"type": "status", "message": "⚖️ Judge checking for agreement..."}
+        
+        quick_check = judge.check_agreement_quick(
+            message_a=message_a,
+            message_b=message_b,
+            round_num=round_num
+        )
+        
+        if quick_check.get("agreement_reached"):
+            agreement_detected = True
+            agreed_price = quick_check.get("agreed_price")
             yield {
-                "type": "status", 
-                "message": f"🎉 Agreement detected! Both agents agreed on ${agreed_price:.2f} in Round {round_num}"
+                "type": "status",
+                "message": f"✅ Judge: Agreement reached at ${agreed_price:.2f} in Round {round_num}! {quick_check.get('explanation', '')}"
             }
             break
+        else:
+            yield {
+                "type": "status",
+                "message": f"↔️ Judge: No agreement yet. {quick_check.get('explanation', 'Negotiation continues...')}"
+            }
     
-    # Always use Judge to analyze the complete negotiation (even if early agreement detected)
-    yield {"type": "status", "message": "Analyzing negotiation with Judge..."}
+    # Use Judge to analyze the complete negotiation for winner/satisfaction
+    yield {"type": "status", "message": "📊 Judge analyzing full negotiation..."}
     
-    judge = Judge()
     judge_analysis = judge.analyze_negotiation(
         messages=messages,
         scenario_info=agent_a.scenario_public_info,
@@ -183,12 +155,11 @@ def run_negotiation_realtime(
         scenario_type=scenario_type
     )
     
-    # If early agreement was detected, override the Judge's terms with detected price
-    if early_agreement:
+    # If agreement was detected during rounds, use that info
+    if agreement_detected:
         judge_analysis["agreement_reached"] = True
-        judge_analysis["agreement_terms"] = {"price": early_agreement_price}
-        judge_analysis["early_stop"] = True
-        # Keep Judge's winner and satisfaction analysis
+        judge_analysis["agreement_terms"] = {"price": agreed_price}
+        judge_analysis["stopped_early"] = True
     
     # Extract results from Judge analysis
     agreement_reached = judge_analysis.get("agreement_reached", False)
