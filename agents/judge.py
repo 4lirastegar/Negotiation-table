@@ -9,7 +9,8 @@ from config.config import OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_PROVIDER, LLM_M
 import json
 import re
 
-# Define the JSON schema for structured outputs (like your FishGPT!)
+# Define the JSON schema for structured outputs
+# ACADEMIC APPROACH: Judge only determines FACTS, not subjective ratings
 JUDGE_ANALYSIS_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
@@ -20,7 +21,7 @@ JUDGE_ANALYSIS_SCHEMA = {
             "properties": {
                 "agreement_reached": {
                     "type": "boolean",
-                    "description": "Whether both agents reached a mutual agreement"
+                    "description": "Whether both agents explicitly agreed to the same terms"
                 },
                 "agreement_terms": {
                     "anyOf": [
@@ -41,27 +42,12 @@ JUDGE_ANALYSIS_SCHEMA = {
                     ],
                     "description": "The agreed upon terms (price), or null if no agreement"
                 },
-                "winner": {
+                "explanation": {
                     "type": "string",
-                    "description": "Who benefited more: 'Agent A', 'Agent B', 'Both', or 'Neither'",
-                    "enum": ["Agent A", "Agent B", "Both", "Neither"]
-                },
-                "reasoning": {
-                    "type": "string",
-                    "description": "Detailed explanation of why agreement was/wasn't reached and who won"
-                },
-                "agent_a_satisfaction": {
-                    "type": "string",
-                    "description": "How satisfied Agent A is with the outcome",
-                    "enum": ["high", "medium", "low"]
-                },
-                "agent_b_satisfaction": {
-                    "type": "string",
-                    "description": "How satisfied Agent B is with the outcome",
-                    "enum": ["high", "medium", "low"]
+                    "description": "Brief factual explanation of whether/how agreement was reached"
                 }
             },
-            "required": ["agreement_reached", "agreement_terms", "winner", "reasoning", "agent_a_satisfaction", "agent_b_satisfaction"],
+            "required": ["agreement_reached", "agreement_terms", "explanation"],
             "additionalProperties": False
         }
     }
@@ -274,31 +260,14 @@ Return your analysis in JSON format."""
         # Format conversation
         conversation_text = self._format_conversation(messages)
         
-        # Build prompt
+        # Build prompt - FACTUAL ANALYSIS ONLY
         prompt_parts = []
         prompt_parts.append("=" * 70)
-        prompt_parts.append("YOU ARE A NEGOTIATION ADJUDICATOR")
+        prompt_parts.append("YOU ARE A FACTUAL NEGOTIATION ANALYZER")
         prompt_parts.append("=" * 70)
         prompt_parts.append("")
-        prompt_parts.append("Your task is to analyze a negotiation transcript and determine:")
-        prompt_parts.append("1. Was an agreement reached?")
-        prompt_parts.append("2. What were the agreed terms (if any)?")
-        prompt_parts.append("3. Who 'won' or benefited more?")
-        prompt_parts.append("4. Why did the negotiation succeed or fail?")
-        prompt_parts.append("")
-        
-        prompt_parts.append("=" * 70)
-        prompt_parts.append("SCENARIO INFORMATION:")
-        prompt_parts.append("=" * 70)
-        prompt_parts.append(f"Type: {scenario_type}")
-        prompt_parts.append(f"Public Info: {json.dumps(scenario_info, indent=2)}")
-        prompt_parts.append("")
-        
-        prompt_parts.append("=" * 70)
-        prompt_parts.append("AGENT SECRETS (for reference only - agents didn't know each other's secrets):")
-        prompt_parts.append("=" * 70)
-        prompt_parts.append(f"Agent A Secrets: {json.dumps(agent_a_secrets, indent=2)}")
-        prompt_parts.append(f"Agent B Secrets: {json.dumps(agent_b_secrets, indent=2)}")
+        prompt_parts.append("Your task: Determine if an agreement was reached (FACTUAL ONLY)")
+        prompt_parts.append("DO NOT provide subjective opinions, ratings, or judgments.")
         prompt_parts.append("")
         
         prompt_parts.append("=" * 70)
@@ -308,24 +277,22 @@ Return your analysis in JSON format."""
         prompt_parts.append("")
         
         prompt_parts.append("=" * 70)
-        prompt_parts.append("YOUR ANALYSIS:")
+        prompt_parts.append("YOUR TASK:")
         prompt_parts.append("=" * 70)
         prompt_parts.append("")
-        prompt_parts.append("Provide your analysis in the following JSON format:")
+        prompt_parts.append("Analyze the transcript and provide FACTUAL output:")
         prompt_parts.append("{")
         prompt_parts.append('  "agreement_reached": true/false,')
-        prompt_parts.append('  "agreement_terms": { "price": 650 } or null,')
-        prompt_parts.append('  "winner": "Agent A" or "Agent B" or "Both" or "Neither",')
-        prompt_parts.append('  "reasoning": "Detailed explanation of why agreement was/wasn\'t reached",')
-        prompt_parts.append('  "agent_a_satisfaction": "high/medium/low" (based on how close to their ideal),')
-        prompt_parts.append('  "agent_b_satisfaction": "high/medium/low"')
+        prompt_parts.append('  "agreement_terms": { "price": 712 } or null,')
+        prompt_parts.append('  "explanation": "Brief factual summary"')
         prompt_parts.append("}")
         prompt_parts.append("")
-        prompt_parts.append("IMPORTANT:")
-        prompt_parts.append("- Only mark agreement_reached as true if BOTH agents explicitly agreed to the SAME terms")
-        prompt_parts.append("- Look for explicit acceptance like 'I accept', 'deal', 'agreed', 'sold'")
-        prompt_parts.append("- If agents are still negotiating or disagreeing, mark as false")
-        prompt_parts.append("- Extract the exact agreed price/terms if agreement was reached")
+        prompt_parts.append("RULES:")
+        prompt_parts.append("- Only mark agreement_reached=true if BOTH agents explicitly agreed to SAME price")
+        prompt_parts.append("- Look for explicit acceptance: 'I accept', 'I agree', 'deal', 'sold'")
+        prompt_parts.append("- Extract the exact agreed price")
+        prompt_parts.append("- Keep explanation factual (e.g., 'Both agents accepted $712 in round 7')")
+        prompt_parts.append("- NO subjective opinions about who won or satisfaction levels")
         prompt_parts.append("")
         prompt_parts.append("Your analysis (JSON only):")
         

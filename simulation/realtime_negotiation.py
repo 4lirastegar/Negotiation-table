@@ -207,3 +207,76 @@ def run_negotiation_realtime(
     
     yield results
     return results
+
+
+def run_single_negotiation(
+    scenario_name: str,
+    agent_a_persona: str,
+    agent_b_persona: str,
+    max_rounds: int = None
+) -> Dict[str, Any]:
+    """
+    Run a single negotiation synchronously (for batch testing)
+    
+    This is a non-generator version that runs the full negotiation
+    and returns the complete results.
+    
+    Args:
+        scenario_name: Name of the scenario to use
+        agent_a_persona: Persona for Agent A
+        agent_b_persona: Persona for Agent B
+        max_rounds: Maximum number of rounds (default from config)
+        
+    Returns:
+        Dictionary with complete negotiation results
+    """
+    if max_rounds is None:
+        max_rounds = MAX_ROUNDS
+    
+    # Load scenario
+    scenario_loader = ScenarioLoader()
+    scenario = scenario_loader.get_scenario(scenario_name)
+    
+    if not scenario:
+        raise ValueError(f"Scenario '{scenario_name}' not found")
+    
+    # Get public info and agent secrets
+    public_info = scenario_loader.get_public_info(scenario_name)
+    agent_a_secrets = scenario_loader.get_agent_secrets(scenario_name, "agent_a")
+    agent_b_secrets = scenario_loader.get_agent_secrets(scenario_name, "agent_b")
+    
+    # Create agents
+    agent_a = Agent(
+        agent_id="Agent A",
+        persona_name=agent_a_persona,
+        scenario_public_info=public_info,
+        agent_secrets=agent_a_secrets
+    )
+    
+    agent_b = Agent(
+        agent_id="Agent B",
+        persona_name=agent_b_persona,
+        scenario_public_info=public_info,
+        agent_secrets=agent_b_secrets
+    )
+    
+    # Run negotiation using the generator, but consume all messages
+    generator = run_negotiation_realtime(
+        agent_a=agent_a,
+        agent_b=agent_b,
+        max_rounds=max_rounds,
+        scenario_type=scenario.get("type", "price_negotiation")
+    )
+    
+    # Consume all generator messages and get final result
+    results = None
+    for message in generator:
+        if message.get("type") == "complete":
+            results = message
+            break
+    
+    # Add total_rounds to match expected format
+    if results:
+        results["total_rounds"] = results.get("rounds", 0)
+    
+    return results

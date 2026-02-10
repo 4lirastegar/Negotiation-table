@@ -221,47 +221,58 @@ class Agent:
         self.my_price_offers = []
         self.last_prompt = ""
     
-    def calculate_utility(self, agreement_terms: Dict) -> float:
+    def calculate_utility(self, agreement_terms: Dict) -> Optional[float]:
         """
         Calculate utility score based on agreement terms
+        ACADEMIC APPROACH: Objective calculation from value functions
+        
+        For price negotiations:
+        - Seller: utility = (agreed_price - min_acceptable) / (ideal - min_acceptable)
+        - Buyer: utility = (max_budget - agreed_price) / (max_budget - ideal)
         
         Args:
-            agreement_terms: Dictionary containing agreement details
+            agreement_terms: Dictionary containing agreement details (e.g., {"price": 712})
             
         Returns:
-            Utility score (0.0 to 1.0)
+            Utility score (0.0 to 1.0), or None if cannot calculate
         """
-        # This is a placeholder - will be implemented based on scenario type
-        # For price negotiation scenarios, compare agreed price to ideal/minimum
-        if "price" in agreement_terms:
-            agreed_price = agreement_terms["price"]
-            ideal_price = self.agent_secrets.get("ideal_price")
-            min_price = self.agent_secrets.get("minimum_acceptable_price")
-            max_price = self.agent_secrets.get("maximum_budget")
-            
-            if ideal_price is not None:
-                if min_price is not None and max_price is not None:
-                    # Normalize: 1.0 if at ideal, 0.0 if at min/max
-                    if ideal_price == min_price:
-                        if agreed_price >= ideal_price:
-                            return 1.0
-                        else:
-                            return 0.0
-                    else:
-                        # Linear interpolation
-                        if agreed_price >= ideal_price:
-                            return 1.0
-                        elif agreed_price <= min_price:
-                            return 0.0
-                        else:
-                            return (agreed_price - min_price) / (ideal_price - min_price)
-                else:
-                    # Simple comparison to ideal
-                    if ideal_price > 0:
-                        return max(0.0, min(1.0, agreed_price / ideal_price))
+        if not agreement_terms or "price" not in agreement_terms:
+            return None
         
-        # Default: return 0.5 if we can't calculate
-        return 0.5
+        agreed_price = agreement_terms["price"]
+        role = self.agent_secrets.get("role", "").lower()
+        
+        # Seller utility calculation
+        if role == "seller":
+            min_price = self.agent_secrets.get("minimum_acceptable_price")
+            ideal_price = self.agent_secrets.get("ideal_price")
+            
+            if min_price is None or ideal_price is None:
+                return None
+            
+            # Utility = how much surplus captured relative to ideal
+            if ideal_price == min_price:
+                return 1.0 if agreed_price >= ideal_price else 0.0
+            
+            utility = (agreed_price - min_price) / (ideal_price - min_price)
+            return max(0.0, min(1.0, utility))  # Clamp to [0, 1]
+        
+        # Buyer utility calculation
+        elif role == "buyer":
+            max_budget = self.agent_secrets.get("maximum_budget")
+            ideal_price = self.agent_secrets.get("ideal_price")
+            
+            if max_budget is None or ideal_price is None:
+                return None
+            
+            # Utility = how much surplus captured relative to ideal
+            if max_budget == ideal_price:
+                return 1.0 if agreed_price <= ideal_price else 0.0
+            
+            utility = (max_budget - agreed_price) / (max_budget - ideal_price)
+            return max(0.0, min(1.0, utility))  # Clamp to [0, 1]
+        
+        return None
     
     def get_info(self) -> Dict:
         """

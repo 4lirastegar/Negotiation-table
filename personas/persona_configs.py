@@ -10,6 +10,10 @@ class PersonaConfigs:
     """Static class containing all persona definitions"""
     
     PERSONAS: Dict[str, Dict] = {
+        "None": {
+            "prompt_addition": ""  # No persona - pure emergent behavior
+        },
+        
         "Aggressive": {
             "prompt_addition": "You are an aggressive negotiator."
         },
