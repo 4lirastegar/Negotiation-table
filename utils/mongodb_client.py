@@ -95,7 +95,8 @@ class MongoDBClient:
                 "agent_a_info": results.get("agent_a_info"),
                 "agent_b_info": results.get("agent_b_info"),
                 "judge_analysis": results.get("judge_analysis"),
-                "scenario_type": results.get("scenario_type")
+                "scenario_type": results.get("scenario_type"),
+                "qualitative_metrics": results.get("qualitative_metrics")  # ← Academic metrics!
             }
             
             # Insert into MongoDB

@@ -122,6 +122,7 @@ def run_negotiation_realtime(
             break
         
         # Ask Judge: Did they reach agreement this round?
+        # ALSO extracts price offers for qualitative analysis!
         yield {"type": "status", "message": "⚖️ Judge checking for agreement..."}
         
         quick_check = judge.check_agreement_quick(
@@ -129,6 +130,14 @@ def run_negotiation_realtime(
             message_b=message_b,
             round_num=round_num
         )
+        
+        # ✨ NEW: Add Judge-extracted prices to the messages we saved
+        # This enables academic-grade concession analysis!
+        if len(messages) >= 2:
+            # Add price to Agent A's message (second-to-last message)
+            messages[-2]["price_offer"] = quick_check.get("agent_a_offer")
+            # Add price to Agent B's message (last message)
+            messages[-1]["price_offer"] = quick_check.get("agent_b_offer")
         
         if quick_check.get("agreement_reached"):
             agreement_detected = True
@@ -172,6 +181,55 @@ def run_negotiation_realtime(
         utility_a = agent_a.calculate_utility(agreement_terms)
         utility_b = agent_b.calculate_utility(agreement_terms)
     
+    # ✨ NEW: Analyze concession patterns for academic metrics
+    yield {"type": "status", "message": "📊 Analyzing concession patterns..."}
+    
+    concession_results = None
+    try:
+        from analysis.qualitative_metrics import ConcessionAnalyzer
+        
+        # Debug: Check message structure
+        print(f"📝 Analyzing {len(messages)} messages")
+        if messages:
+            print(f"📝 First message structure: {list(messages[0].keys())}")
+            print(f"📝 Has 'agent' field: {'agent' in messages[0]}")
+            print(f"📝 Has 'price_offer' field: {'price_offer' in messages[0]}")
+        
+        # 🎯 NEW: Get absolute limits for intensity calculation!
+        # Extract from agent secrets for academic rigor
+        agent_a_limit = agent_a.agent_secrets.get("minimum_acceptable_price")
+        agent_b_limit = agent_b.agent_secrets.get("maximum_budget")
+        
+        print(f"🎯 Agent A absolute limit (min price): ${agent_a_limit}")
+        print(f"🎯 Agent B absolute limit (max budget): ${agent_b_limit}")
+        
+        concession_analyzer = ConcessionAnalyzer()
+        concession_results = concession_analyzer.analyze_negotiation(
+            messages,
+            agent_a_limit=agent_a_limit,  # Seller's minimum
+            agent_b_limit=agent_b_limit   # Buyer's maximum
+        )
+        print(f"✅ Concession analysis completed: {concession_results is not None}")
+        
+        if concession_results:
+            print(f"📊 Agent A concessions: {concession_results.get('agent_a', {}).get('concession_count')}")
+            print(f"📊 Agent B concessions: {concession_results.get('agent_b', {}).get('concession_count')}")
+            
+            # 🎯 NEW: Log intensity metrics!
+            if concession_results.get('agent_a', {}).get('avg_intensity') is not None:
+                print(f"🎯 Agent A avg intensity: {concession_results['agent_a']['avg_intensity']:.1%}")
+                print(f"🎯 Agent A max intensity: {concession_results['agent_a']['max_intensity']:.1%}")
+                print(f"🎯 Agent A pattern: {concession_results['agent_a']['intensity_pattern']}")
+            
+            if concession_results.get('agent_b', {}).get('avg_intensity') is not None:
+                print(f"🎯 Agent B avg intensity: {concession_results['agent_b']['avg_intensity']:.1%}")
+                print(f"🎯 Agent B max intensity: {concession_results['agent_b']['max_intensity']:.1%}")
+                print(f"🎯 Agent B pattern: {concession_results['agent_b']['intensity_pattern']}")
+    except Exception as e:
+        print(f"❌ Concession analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+    
     # Build final results
     results = {
         "agreement_reached": agreement_reached,
@@ -188,6 +246,15 @@ def run_negotiation_realtime(
         "judge_analysis": judge_analysis,
         "type": "complete"
     }
+    
+    # Add qualitative metrics if analysis succeeded
+    if concession_results is not None:
+        results["qualitative_metrics"] = {
+            "concessions": concession_results
+        }
+        print(f"✅ Added qualitative_metrics to results")
+    else:
+        print(f"⚠️ No concession_results, skipping qualitative_metrics")
     
     # Save to MongoDB
     try:

@@ -54,6 +54,7 @@ JUDGE_ANALYSIS_SCHEMA = {
 }
 
 # Lightweight schema for quick agreement checking during negotiation
+# UPDATED: Now also extracts price offers for qualitative analysis (efficient!)
 QUICK_AGREEMENT_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
@@ -73,17 +74,30 @@ QUICK_AGREEMENT_SCHEMA = {
                     ],
                     "description": "The agreed price, or null if no agreement"
                 },
+                "agent_a_offer": {
+                    "anyOf": [
+                        {"type": "number"},
+                        {"type": "null"}
+                    ],
+                    "description": "Agent A's actual price offer in this round (for concession analysis), or null if no new offer"
+                },
+                "agent_b_offer": {
+                    "anyOf": [
+                        {"type": "number"},
+                        {"type": "null"}
+                    ],
+                    "description": "Agent B's actual price offer in this round (for concession analysis), or null if no new offer"
+                },
                 "explanation": {
                     "type": "string",
                     "description": "Brief explanation of why agreement was or wasn't reached"
                 }
             },
-            "required": ["agreement_reached", "agreed_price", "explanation"],
+            "required": ["agreement_reached", "agreed_price", "agent_a_offer", "agent_b_offer", "explanation"],
             "additionalProperties": False
         }
     }
 }
-
 
 class Judge:
     """Adjudicator that analyzes negotiation outcomes"""
@@ -141,8 +155,9 @@ class Judge:
         round_num: int
     ) -> Dict[str, Any]:
         """
-        Quick check if agreement was reached in the last round
+        Quick check if agreement was reached AND extract price offers
         Uses lightweight structured output for speed
+        ONE API call for everything - efficient!
         
         Args:
             message_a: Agent A's most recent message
@@ -150,25 +165,46 @@ class Judge:
             round_num: Current round number
             
         Returns:
-            Dictionary with agreement_reached (bool), agreed_price (float or None), explanation (str)
+            Dictionary with:
+                - agreement_reached (bool): Whether deal was made
+                - agreed_price (float or None): Final agreed price
+                - agent_a_offer (float or None): Agent A's price offer this round
+                - agent_b_offer (float or None): Agent B's price offer this round
+                - explanation (str): Brief explanation
         """
-        # Build quick check prompt
-        prompt = f"""You are a negotiation referee. Analyze these two messages from a negotiation round and determine if BOTH agents explicitly agreed to the SAME terms.
+        # Build quick check prompt (now includes price extraction!)
+        prompt = f"""You are a negotiation referee. Analyze this negotiation round and provide:
+1. Agreement status (did both agents agree?)
+2. Price offers (what price did each agent propose?)
 
 ROUND {round_num}:
 
-Agent A: "{message_a}"
+Agent A (Seller): "{message_a}"
 
-Agent B: "{message_b}"
+Agent B (Buyer): "{message_b}"
 
-RULES:
-- Only return TRUE if BOTH agents explicitly agreed to the SAME price
-- Look for phrases like "I agree to $X", "I accept $X", "deal at $X", "let's finalize at $X"
-- If one agent proposes and the other accepts the SAME price → TRUE
-- If agents are still counter-offering different prices → FALSE
-- If agents are discussing logistics after agreement → still TRUE
+AGREEMENT RULES:
+- Only return agreement_reached=TRUE if BOTH agents explicitly agreed to SAME price
+- Look for: "I agree to $X", "I accept $X", "deal at $X", "sold at $X"
+- If one proposes and other accepts SAME price → TRUE
+- If still counter-offering different prices → FALSE
+- If discussing logistics after agreement → still TRUE
 
-Return your analysis in JSON format."""
+PRICE EXTRACTION RULES:
+- Extract the ACTUAL price offer each agent is proposing this round
+- If multiple prices mentioned, extract the PRIMARY offer (usually the last/main one)
+- Ignore year numbers (like "2018 Honda Civic")
+- If agent just acknowledges/accepts without NEW offer → return null
+- If agent says "I accept your offer" → return null (not a new offer)
+
+Examples:
+  "I can offer $750 or maybe $800" → agent_a_offer: 800
+  "How about $700?" → agent_b_offer: 700
+  "2018 Honda Civic for $850" → extract 850 (ignore 2018)
+  "I accept!" → return null (no new offer)
+  "Thank you" → return null (no offer)
+
+Return JSON with: agreement_reached, agreed_price, agent_a_offer, agent_b_offer, explanation"""
 
         try:
             if self.llm_provider == "openai":
