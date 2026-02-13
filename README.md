@@ -355,7 +355,6 @@ University of Milan, Department of Computer Science
 ## 🙏 Acknowledgments
 
 - Prof. Alfio Ferrara (Course Instructor)
-- Dott. Sergio Picascia, Dott.ssa Elisabetta Rocchetti (Teaching Assistants)
 - OpenAI (GPT-4o and GPT-4 API)
 - Hugging Face (Pre-trained transformer models)
 
