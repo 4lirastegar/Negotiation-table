@@ -1,0 +1,6 @@
+Persona,Context Coherence,Self Coherence,Goal Coherence,N
+Aggressive,0.71,0.77,0.35,40
+Fair,0.70,0.76,0.37,40
+Liar,0.76,0.76,0.33,10
+None,0.72,0.75,0.36,20
+Strategic,0.71,0.75,0.33,10

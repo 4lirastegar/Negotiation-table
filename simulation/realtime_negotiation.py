@@ -230,6 +230,97 @@ def run_negotiation_realtime(
         import traceback
         traceback.print_exc()
     
+    # ✨ NEW: Analyze persuasion tactics
+    yield {"type": "status", "message": "🎯 Analyzing persuasion tactics..."}
+    
+    tactics_results = None
+    try:
+        from analysis.persuasion_tactics import PersuasionTacticsAnalyzer
+        
+        print(f"🎯 Analyzing persuasion tactics...")
+        tactics_analyzer = PersuasionTacticsAnalyzer()
+        tactics_results = tactics_analyzer.analyze_negotiation(messages)
+        print(f"✅ Tactics analysis completed")
+        
+        if tactics_results:
+            print(f"📊 Agent A dominant tactic: {tactics_results['agent_a']['dominant_tactic']}")
+            print(f"📊 Agent B dominant tactic: {tactics_results['agent_b']['dominant_tactic']}")
+    except Exception as e:
+        print(f"❌ Tactics analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # ✨ NEW: Analyze emotional tone
+    yield {"type": "status", "message": "😊 Analyzing emotional tone..."}
+    
+    emotion_results = None
+    try:
+        from analysis.emotional_tone import EmotionalToneAnalyzer
+        
+        print(f"😊 Analyzing emotional tone...")
+        emotion_analyzer = EmotionalToneAnalyzer()
+        emotion_results = emotion_analyzer.analyze_negotiation(messages)
+        print(f"✅ Emotion analysis completed")
+        
+        if emotion_results:
+            print(f"📊 Agent A dominant tone: {emotion_results['agent_a']['dominant_tone']}")
+            print(f"📊 Agent B dominant tone: {emotion_results['agent_b']['dominant_tone']}")
+            print(f"📊 Emotional correlation: {emotion_results.get('emotional_correlation', 0):.2f}")
+    except Exception as e:
+        print(f"❌ Emotion analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # ✨ NEW: Analyze logical coherence
+    yield {"type": "status", "message": "🧩 Analyzing logical coherence..."}
+    
+    coherence_results = None
+    try:
+        from analysis.logical_coherence import LogicalCoherenceAnalyzer
+        
+        print(f"🧩 Analyzing logical coherence...")
+        coherence_analyzer = LogicalCoherenceAnalyzer()
+        
+        # Get agent roles from secrets
+        agent_a_role = agent_a.agent_secrets.get("role", "seller").lower()
+        agent_b_role = agent_b.agent_secrets.get("role", "buyer").lower()
+        
+        coherence_results = coherence_analyzer.analyze_negotiation(
+            messages,
+            agent_a_role=agent_a_role,
+            agent_b_role=agent_b_role
+        )
+        print(f"✅ Coherence analysis completed")
+        
+        if coherence_results:
+            print(f"📊 Agent A overall coherence: {coherence_results['agent_a']['overall_coherence']:.2f}")
+            print(f"📊 Agent B overall coherence: {coherence_results['agent_b']['overall_coherence']:.2f}")
+    except Exception as e:
+        print(f"❌ Coherence analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # ✨ NEW: Analyze language complexity
+    yield {"type": "status", "message": "📝 Analyzing language complexity..."}
+    
+    language_results = None
+    try:
+        from analysis.language_metrics import LanguageMetrics
+        
+        print(f"📝 Analyzing language complexity...")
+        language_results = LanguageMetrics.analyze_negotiation_transcript(messages)
+        print(f"✅ Language complexity analysis completed")
+        
+        if language_results:
+            print(f"📊 Agent A avg words per message: {language_results['agent_a']['avg_words_per_message']:.1f}")
+            print(f"📊 Agent B avg words per message: {language_results['agent_b']['avg_words_per_message']:.1f}")
+            print(f"📊 Agent A vocabulary richness: {language_results['agent_a']['avg_vocabulary_richness']:.2f}")
+            print(f"📊 Agent B vocabulary richness: {language_results['agent_b']['avg_vocabulary_richness']:.2f}")
+    except Exception as e:
+        print(f"❌ Language complexity analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+    
     # Build final results
     results = {
         "agreement_reached": agreement_reached,
@@ -247,14 +338,45 @@ def run_negotiation_realtime(
         "type": "complete"
     }
     
-    # Add qualitative metrics if analysis succeeded
+    # Add qualitative metrics if analyses succeeded
+    qualitative_metrics = {}
+    
     if concession_results is not None:
-        results["qualitative_metrics"] = {
-            "concessions": concession_results
+        qualitative_metrics["concessions"] = concession_results
+        print(f"✅ Added concessions to qualitative_metrics")
+    
+    if tactics_results is not None:
+        # Remove the verbose 'messages' field to save space
+        tactics_summary = {
+            "agent_a": {k: v for k, v in tactics_results["agent_a"].items() if k != "messages"},
+            "agent_b": {k: v for k, v in tactics_results["agent_b"].items() if k != "messages"}
         }
-        print(f"✅ Added qualitative_metrics to results")
+        qualitative_metrics["persuasion_tactics"] = tactics_summary
+        print(f"✅ Added persuasion_tactics to qualitative_metrics")
+    
+    if emotion_results is not None:
+        # Remove the verbose 'sequence' field to save space
+        emotion_summary = {
+            "agent_a": {k: v for k, v in emotion_results["agent_a"].items() if k != "sequence"},
+            "agent_b": {k: v for k, v in emotion_results["agent_b"].items() if k != "sequence"},
+            "emotional_correlation": emotion_results.get("emotional_correlation")
+        }
+        qualitative_metrics["emotional_tone"] = emotion_summary
+        print(f"✅ Added emotional_tone to qualitative_metrics")
+    
+    if coherence_results is not None:
+        qualitative_metrics["logical_coherence"] = coherence_results
+        print(f"✅ Added logical_coherence to qualitative_metrics")
+    
+    if language_results is not None:
+        qualitative_metrics["language_complexity"] = language_results
+        print(f"✅ Added language_complexity to qualitative_metrics")
+    
+    if qualitative_metrics:
+        results["qualitative_metrics"] = qualitative_metrics
+        print(f"✅ Added qualitative_metrics to results with {len(qualitative_metrics)} components")
     else:
-        print(f"⚠️ No concession_results, skipping qualitative_metrics")
+        print(f"⚠️ No qualitative metrics calculated")
     
     # Save to MongoDB
     try:

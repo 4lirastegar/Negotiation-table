@@ -1,9 +1,3 @@
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -26,6 +20,14 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Environment Variables
+.env
+
 # IDE
 .vscode/
 .idea/
@@ -33,13 +35,41 @@ wheels/
 *.swo
 *~
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Environment variables
-.env
-.env.local
-
-# OS
+# MacOS
 .DS_Store
-Thumbs.db
+
+# MongoDB
+*.lock
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Report (LaTeX source)
+FINAL_REPORT_CONDENSED.tex
+
+# Temporary files
+*.tmp
+*.bak
+CLEANUP_SUMMARY.md
+
+# Jupyter Notebooks (if any)
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+
+# Data (optional - uncomment if you don't want to commit data)
+# *.csv
+
+# Models (large files)
+# models/

@@ -1,0 +1,7 @@
+Persona Combination,Avg Words/Msg,Vocab Richness,Flesch Ease,Flesch Grade,Avg Sent Length,N
+Aggressive vs Aggressive,103.0,0.74,63.7,8.3,18.7,10
+Aggressive vs Fair,101.5,0.74,66.0,7.8,17.4,10
+Fair vs Fair,90.6,0.75,69.8,6.9,15.6,10
+Liar vs Fair,104.4,0.74,65.9,7.8,17.4,10
+None vs None,94.4,0.75,67.0,7.5,16.5,10
+Strategic vs Aggressive,97.8,0.75,66.0,7.8,17.4,10

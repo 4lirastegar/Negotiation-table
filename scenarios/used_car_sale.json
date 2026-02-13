@@ -10,15 +10,13 @@
   },
   "agent_a_secrets": {
     "role": "Seller",
-    "minimum_acceptable_price": 600,
-    "ideal_price": 750,
-    "urgency": "medium"
+    "minimum_acceptable_price": 720,
+    "ideal_price": 800
   },
   "agent_b_secrets": {
     "role": "Buyer",
-    "maximum_budget": 800,
-    "ideal_price": 650,
-    "urgency": "medium"
+    "maximum_budget": 750,
+    "ideal_price": 650
   },
   "market_value": {
     "fair_price_range": {
