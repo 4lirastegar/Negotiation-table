@@ -56,7 +56,7 @@ class PersuasionTacticsAnalyzer:
         self.classifier = pipeline(
             "zero-shot-classification",
             model=model_name,
-            device=0  # CPU = -1, use device=0 for GPU 
+            device=0  # CPU = -1, GPU=0
         )
         print("✅ Persuasion tactics analyzer loaded")
     
@@ -75,12 +75,12 @@ class PersuasionTacticsAnalyzer:
         if not message or len(message.strip()) < 5:
             return {"tactics": [], "scores": {}, "dominant_tactic": None}
         
-        # Run zero-shot classification with better hypothesis template
+        
         result = self.classifier(
             message,
             candidate_labels=self.TACTICS,
             hypothesis_template="The speaker is using {}.",
-            multi_label=False  # Single best tactic per message
+            multi_label=False  
         )
         
         # Map full labels back to short names and extract tactics above threshold

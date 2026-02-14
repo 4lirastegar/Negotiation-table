@@ -27,15 +27,15 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
         font-size: 16px !important;
         line-height: 1.7 !important;
-        color: #FFFFFF !important;
+        color: #1E293B !important;
         font-weight: 500 !important;
         margin: 0 !important;
     }
     
-    /* Agent A (info boxes) - Professional blue */
+    /* Agent A (info boxes) - Professional blue with light background */
     .stAlert[data-baseweb="notification"] {
-        background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%) !important;
-        border: none !important;
+        background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%) !important;
+        border: 2px solid #3B82F6 !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
     }
     
@@ -45,10 +45,10 @@ st.markdown("""
         border-radius: 0.75rem !important;
     }
     
-    /* Success boxes (Agent B) - Professional green */
+    /* Success boxes (Agent B) - Professional green with light background */
     div[data-baseweb="notification"][kind="success"] {
-        background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important;
-        border: none !important;
+        background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%) !important;
+        border: 2px solid #10B981 !important;
     }
     
     /* Warning boxes */

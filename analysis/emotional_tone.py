@@ -42,7 +42,7 @@ class EmotionalToneAnalyzer:
         )
         print("✅ Emotional tone analyzer loaded")
         
-        # Map emotions to categories
+        
         self.emotion_categories = {
             "joy": "positive",
             "love": "positive",
