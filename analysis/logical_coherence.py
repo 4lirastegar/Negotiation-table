@@ -1,14 +1,3 @@
-"""
-Logical Coherence Analysis for Negotiation
-
-This module uses sentence embeddings to measure logical coherence in negotiations.
-Reveals genuine reasoning (goal-coherent), pragmatic adaptation (context-coherent),
-and scripted behavior (incoherent).
-
-Academic Reference:
-Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence Embeddings
-using Siamese BERT-Networks. EMNLP 2019.
-"""
 
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer, util
@@ -136,16 +125,16 @@ class LogicalCoherenceAnalyzer:
                 "overall_coherence": 0.0
             }
         
-        # 1. Context Coherence: How well does agent respond to opponent?
+        # 1. Context Coherence
         context_coherence = self._calculate_context_coherence(
             agent_messages,
             opponent_messages
         )
         
-        # 2. Self Coherence: Are agent's messages consistent?
+        # 2. Self Coherence
         self_coherence = self._calculate_self_coherence(agent_messages)
         
-        # 3. Goal Coherence: Do messages align with role objective?
+        # 3. Goal Coherence
         goal_coherence = self._calculate_goal_coherence(
             agent_messages,
             agent_role

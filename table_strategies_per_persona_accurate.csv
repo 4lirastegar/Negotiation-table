@@ -1,0 +1,6 @@
+Persona,Persuasion (Avg),Cooperation (Avg),Compromise (Avg),Deception (Avg),Pressure (Avg),Agreement Rate,Positive Emotion %,Avg Utility,N (agent instances)
+Aggressive,1.77,0.10,4.67,0.00,0.00,92%,65.5%,0.29,40
+Fair,0.30,0.15,5.30,0.00,0.00,92%,75.6%,0.13,40
+Liar,2.90,0.00,4.00,0.00,0.00,80%,75.5%,0.48,10
+None,0.90,0.14,5.29,0.00,0.00,90%,68.7%,0.20,21
+Strategic,1.22,0.00,4.33,0.00,0.00,100%,65.9%,0.00,9

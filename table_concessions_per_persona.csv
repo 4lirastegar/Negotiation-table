@@ -1,0 +1,6 @@
+Persona,Avg Intensity,Max Intensity,Concession Count,Total Concession ($),N
+Aggressive,0.410,0.647,4.4,$127.47,40
+Fair,0.573,0.780,3.8,$107.21,40
+Liar,0.278,0.402,5.3,$162.50,10
+None,0.628,1.034,4.2,$107.26,21
+Strategic,0.968,1.889,5.7,$142.78,9
